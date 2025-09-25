@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gugu Color IA: Crie e Pinte!</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#3B82F6"/>
+    <meta name="description" content="Transforme sua imaginação em desenhos para colorir com IA!"/>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/3B82F6/ffffff?text=Gugu&font=fredoka-one">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gugu Color IA">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Bibliotecas para gerar o PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        h1, .fredoka-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        .rainbow-text {
+            background: linear-gradient(to right, #6EE7B7, #3B82F6, #9333EA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn {
+             @apply font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 fredoka-font text-lg sm:text-xl;
+        }
+        .btn-primary {
+            @apply bg-blue-500 hover:bg-blue-600 text-white;
+        }
+        .btn-secondary {
+            @apply bg-green-500 hover:bg-green-600 text-white fredoka-font text-base sm:text-lg py-2 px-5;
+        }
+        .btn-tertiary {
+            @apply bg-yellow-400 hover:bg-yellow-500 text-white;
+        }
+        .btn-quaternary {
+            @apply bg-purple-500 hover:bg-purple-600 text-white fredoka-font text-base sm:text-lg py-2 px-5;
+        }
+        .btn-idea {
+             @apply bg-orange-500 hover:bg-orange-600 text-white;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        audio::-webkit-media-controls-panel {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 md:p-10 w-full max-w-2xl text-center">
+        <!-- Cabeçalho -->
+        <h1 class="text-4xl sm:text-5xl font-bold mb-2 fredoka-font">
+            <span class="rainbow-text">Gugu Color IA</span>
+        </h1>
+        <p class="text-gray-600 mb-8 text-base sm:text-lg">Descreva seu personagem e nós o transformamos em um desenho para colorir! E ainda gere histórias narradas!</p>
+
+        <!-- Formulário de Geração -->
+        <div id="form-container" class="space-y-4">
+            <input type="text" id="prompt-input" class="w-full px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-300 focus:border-blue-500 transition duration-300" placeholder="Ex: Homem-Aranha, Princesa Peach...">
+            <p id="prompt-error" class="text-red-500 text-sm hidden -mt-2 mb-2 text-left">Por favor, descreva o que você quer desenhar!</p>
+             <div class="flex flex-wrap justify-center items-center gap-4">
+                <button id="idea-btn" class="btn btn-tertiary">💡 Me Dê uma Ideia!</button>
+                <button id="character-idea-btn" class="btn btn-idea hidden">🎭 5 Ideias</button>
+                <button id="generate-btn" class="btn btn-primary">✨ Gerar Desenho!</button>
+            </div>
+            <!-- Container para as ideias de personagem -->
+            <div id="character-ideas-container" class="mt-4 flex flex-wrap gap-2 justify-center hidden"></div>
+        </div>
+
+        <!-- Área de Exibição da Imagem -->
+        <div id="result-container" class="mt-8 hidden">
+            <!-- Carregamento -->
+            <div id="loader" class="flex flex-col items-center justify-center space-y-4 hidden">
+                 <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500"></div>
+                 <p class="text-gray-500 fredoka-font text-xl">Criando sua obra de arte...</p>
+            </div>
+            <!-- Erro -->
+            <div id="error-message" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg" role="alert">
+                <p class="font-bold">Oops!</p>
+                <p>Não conseguimos gerar a imagem. Tente descrever de outra forma!</p>
+            </div>
+            <!-- Imagem Gerada -->
+            <div id="image-wrapper" class="bg-gray-100 p-4 rounded-lg border-2 border-dashed border-gray-300 hidden">
+                 <img id="generated-image" src="" alt="Desenho gerado por IA" class="w-full h-auto rounded-md object-contain max-h-[500px]">
+            </div>
+            <!-- Botões de Ação -->
+            <div id="action-buttons" class="mt-6 flex flex-wrap flex-col sm:flex-row items-center justify-center gap-4 hidden">
+                 <button id="regenerate-btn" class="btn btn-primary w-full sm:w-auto">🎨 Gerar Novamente</button>
+                 <button id="download-btn" class="btn btn-secondary w-full sm:w-auto">📄 Baixar PDF</button>
+                 <button id="story-btn" class="btn btn-quaternary w-full sm:w-auto">📖 Criar uma História</button>
+            </div>
+            <!-- Container da História e Áudio -->
+            <div id="story-container" class="mt-6 text-left p-4 bg-gray-50 rounded-lg border border-gray-200 hidden">
+                <div id="story-loader" class="flex flex-col items-center justify-center space-y-2 hidden">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                    <p class="text-gray-500 fredoka-font">Escrevendo uma história mágica...</p>
+                </div>
+                <div id="story-content" class="text-gray-700 space-y-3"></div>
+                 <!-- Player de Áudio -->
+                <div id="audio-container" class="mt-4 hidden">
+                    <div id="audio-loader" class="flex items-center space-x-2">
+                        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+                        <p class="text-gray-500 fredoka-font text-sm">Preparando a narração...</p>
+                    </div>
+                    <audio id="audio-player" controls class="w-full hidden rounded-lg"></audio>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center pt-8 text-gray-500 text-sm">
+             Feito com ❤️ para despertar a criatividade das crianças por <br> <strong>LEGACY INTELIGÊNCIA DIGITAL</strong>
+        </footer>
+    </div>
+
+    <script>
+        // --- PWA SETUP ---
+
+        // 1. Gerar Manifest dinamicamente
+        const manifest = {
+            "name": "Gugu Color IA",
+            "short_name": "Gugu IA",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#f9fafb",
+            "theme_color": "#3B82F6",
+            "description": "Transforme sua imaginação em desenhos para colorir com IA!",
+            "icons": [
+                {
+                    "src": "https://placehold.co/192x192/3B82F6/ffffff?text=Gugu&font=fredoka-one",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                },
+                {
+                    "src": "https://placehold.co/512x512/3B82F6/ffffff?text=Gugu&font=fredoka-one",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestURL = URL.createObjectURL(manifestBlob);
+        document.querySelector('link[rel="manifest"]').setAttribute('href', manifestURL);
+
+        // 2. Registrar Service Worker
+        if ('serviceWorker' in navigator) {
+            const swContent = `
+                const CACHE_NAME = 'gugu-color-ia-v1';
+                const assetsToCache = [
+                    '/',
+                    'https://cdn.tailwindcss.com',
+                    'https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;500;700&display=swap',
+                    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+                ];
+
+                self.addEventListener('install', event => {
+                    event.waitUntil(
+                        caches.open(CACHE_NAME)
+                            .then(cache => {
+                                return cache.addAll(assetsToCache);
+                            })
+                    );
+                });
+
+                self.addEventListener('fetch', event => {
+                    event.respondWith(
+                        caches.match(event.request)
+                            .then(response => {
+                                return response || fetch(event.request);
+                            })
+                    );
+                });
+            `;
+            const swBlob = new Blob([swContent], { type: 'application/javascript' });
+            const swURL = URL.createObjectURL(swBlob);
+
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(swURL)
+                    .then(registration => console.log('Service Worker registrado com sucesso:', registration))
+                    .catch(error => console.log('Falha ao registrar Service Worker:', error));
+            });
+        }
+
+
+        // --- APP LOGIC ---
+
+        // Elementos do DOM
+        const promptInput = document.getElementById('prompt-input');
+        const promptError = document.getElementById('prompt-error');
+        const generateBtn = document.getElementById('generate-btn');
+        const ideaBtn = document.getElementById('idea-btn');
+        const characterIdeaBtn = document.getElementById('character-idea-btn');
+        const characterIdeasContainer = document.getElementById('character-ideas-container');
+        const resultContainer = document.getElementById('result-container');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('error-message');
+        const imageWrapper = document.getElementById('image-wrapper');
+        const generatedImage = document.getElementById('generated-image');
+        const actionButtons = document.getElementById('action-buttons');
+        const regenerateBtn = document.getElementById('regenerate-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const storyBtn = document.getElementById('story-btn');
+        const storyContainer = document.getElementById('story-container');
+        const storyLoader = document.getElementById('story-loader');
+        const storyContent = document.getElementById('story-content');
+        const audioContainer = document.getElementById('audio-container');
+        const audioLoader = document.getElementById('audio-loader');
+        const audioPlayer = document.getElementById('audio-player');
+        
+        // Chave de API será injetada pelo ambiente
+        const apiKey = "";
+
+        // URLs da API
+        const IMAGE_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+        const TEXT_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+        const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+        // --- Funções Auxiliares ---
+        
+        const base64ToArrayBuffer = (base64) => {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        };
+
+        const pcmToWav = (pcmData, sampleRate) => {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const blockAlign = (numChannels * bitsPerSample) / 8;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = pcmData.byteLength;
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+            view.setUint32(0, 0x52494646, false); // "RIFF"
+            view.setUint32(4, 36 + dataSize, true); // file size - 8
+            view.setUint32(8, 0x57415645, false); // "WAVE"
+            view.setUint32(12, 0x666d7420, false); // "fmt " chunk
+            view.setUint32(16, 16, true); // format chunk size
+            view.setUint16(20, 1, true); // audio format (1 = PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitsPerSample, true);
+            view.setUint32(36, 0x64617461, false); // "data" chunk
+            view.setUint32(40, dataSize, true); // data chunk size
+            const pcm = new Int16Array(pcmData);
+            for (let i = 0; i < pcm.length; i++) {
+                view.setInt16(44 + i * 2, pcm[i], true);
+            }
+            return new Blob([view], { type: 'audio/wav' });
+        };
+        
+        // --- Funções Principais ---
+        
+        const getCharacterIdeas = async () => {
+            const characterName = promptInput.value.trim();
+            if (!characterName) return;
+
+            characterIdeaBtn.disabled = true;
+            characterIdeaBtn.innerHTML = '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>';
+            characterIdeasContainer.innerHTML = '';
+            characterIdeasContainer.classList.add('hidden');
+
+            const systemPrompt = `Gere 5 ideias criativas e simples para uma página de colorir com o personagem: "${characterName}". As ideias devem ser curtas, para caber em um botão. Retorne as 5 ideias separadas por um ponto e vírgula (;). Exemplo: Personagem voando; Personagem comendo pizza; Personagem na praia.`;
+
+            try {
+                const response = await fetch(TEXT_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+                });
+                if (!response.ok) throw new Error("API call failed");
+
+                const result = await response.json();
+                const ideasText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (ideasText) {
+                    const ideas = ideasText.split(';').filter(idea => idea.trim() !== '');
+                    characterIdeasContainer.classList.remove('hidden');
+                    characterIdeasContainer.classList.add('animate-fade-in');
+
+                    ideas.slice(0, 5).forEach(ideaText => {
+                        const idea = ideaText.trim();
+                        const ideaButton = document.createElement('button');
+                        ideaButton.textContent = idea;
+                        ideaButton.className = 'bg-gray-200 hover:bg-blue-200 text-gray-800 font-semibold py-2 px-4 rounded-full text-sm transition duration-300 transform hover:scale-105';
+                        ideaButton.onclick = () => {
+                            promptInput.value = `${characterName} ${idea}`;
+                            generateImage();
+                            characterIdeasContainer.classList.add('hidden');
+                            characterIdeasContainer.innerHTML = '';
+                        };
+                        characterIdeasContainer.appendChild(ideaButton);
+                    });
+                } else { throw new Error("No ideas generated"); }
+            } catch (error) {
+                console.error("Error getting character ideas:", error);
+                characterIdeasContainer.innerHTML = `<p class="text-red-500 text-sm">Não foi possível gerar ideias. Tente novamente.</p>`;
+                characterIdeasContainer.classList.remove('hidden');
+            } finally {
+                characterIdeaBtn.disabled = false;
+                characterIdeaBtn.innerHTML = '🎭 5 Ideias';
+            }
+        };
+
+        const getDrawingIdea = async () => {
+            ideaBtn.disabled = true;
+            ideaBtn.innerHTML = '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>';
+            const systemPrompt = "Você é um gerador de ideias para desenhos infantis. Gere uma única ideia criativa, divertida e simples para uma criança desenhar. Retorne APENAS a ideia, sem nenhuma outra palavra, pontuação ou frase introdutória. Por exemplo: 'um leão mágico com asas de borboleta'.";
+            try {
+                const response = await fetch(TEXT_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+                });
+                if (!response.ok) throw new Error("API call failed");
+                const result = await response.json();
+                const idea = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (idea) {
+                    promptInput.value = idea.trim();
+                } else { throw new Error("No idea generated"); }
+            } catch (error) {
+                console.error("Error getting an idea:", error);
+                promptInput.value = "um coelho super-herói";
+            } finally {
+                ideaBtn.disabled = false;
+                ideaBtn.innerHTML = '💡 Me Dê uma Ideia!';
+            }
+        };
+
+        const generateAudio = async (textToSpeak) => {
+            audioContainer.classList.remove('hidden');
+            audioLoader.classList.remove('hidden');
+            audioPlayer.classList.add('hidden');
+            
+            const prompt = `Say cheerfully and with excitement, as if telling a story to a child: ${textToSpeak}. Now, encourage them to color the drawing: Que tal dar vida a essa história? Pegue seus lápis de cor e pinte o desenho com muito capricho para deixá-lo bem bonito e colorido!`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const response = await fetch(TTS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error("TTS API call failed");
+
+                const result = await response.json();
+                const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                const mimeType = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const wavBlob = pcmToWav(pcmData, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    audioPlayer.src = audioUrl;
+                    audioLoader.classList.add('hidden');
+                    audioPlayer.classList.remove('hidden');
+                } else { throw new Error("Invalid audio data in response"); }
+
+            } catch (error) {
+                console.error("Error generating audio:", error);
+                audioLoader.classList.add('hidden');
+                const errorP = document.createElement('p');
+                errorP.className = "text-red-500 text-sm";
+                errorP.textContent = "Não foi possível carregar a narração.";
+                if(!audioContainer.querySelector('p.text-red-500')) {
+                    audioContainer.appendChild(errorP);
+                }
+            }
+        };
+
+        const generateStory = async () => {
+            const userPrompt = promptInput.value.trim();
+            if (!userPrompt) return;
+            storyBtn.disabled = true;
+            storyBtn.innerHTML = '<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>';
+            storyContainer.classList.remove('hidden');
+            storyContainer.classList.add('animate-fade-in');
+            storyLoader.classList.remove('hidden');
+            storyContent.classList.add('hidden');
+            audioContainer.classList.add('hidden');
+            audioPlayer.src = '';
+            
+            const systemPrompt = "Você é um contador de histórias para crianças. Escreva uma história curta (2 a 3 parágrafos), encantadora e positiva baseada na seguinte ideia. Use uma linguagem simples e cativante, perfeita para crianças. Não use formatação HTML, apenas texto puro.";
+            try {
+                const response = await fetch(TEXT_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+                if (!response.ok) throw new Error("API call failed");
+                const result = await response.json();
+                let story = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (story) {
+                    const paragraphs = story.split('\n').filter(p => p.trim() !== '').map(p => `<p class="mb-3">${p}</p>`).join('');
+                    storyContent.innerHTML = paragraphs;
+                    storyLoader.classList.add('hidden');
+                    storyContent.classList.remove('hidden');
+                    await generateAudio(story);
+                } else { throw new Error("No story generated"); }
+            } catch (error)
+            {
+                console.error("Error generating story:", error);
+                storyContent.innerHTML = "<p>Oh não! O livro de histórias mágicas parece estar fechado agora. Tente novamente mais tarde!</p>";
+                storyLoader.classList.add('hidden');
+                storyContent.classList.remove('hidden');
+            } finally {
+                storyBtn.disabled = false;
+                storyBtn.innerHTML = '📖 Criar uma História';
+            }
+        };
+        
+        const generateImage = async () => {
+            const userPrompt = promptInput.value.trim();
+            if (!userPrompt) {
+                promptError.classList.remove('hidden');
+                return;
+            }
+            resultContainer.classList.remove('hidden');
+            storyContainer.classList.add('hidden');
+            storyContent.innerHTML = '';
+            audioContainer.classList.add('hidden');
+            audioPlayer.src = '';
+
+            loader.classList.remove('hidden');
+            imageWrapper.classList.add('hidden');
+            actionButtons.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Gerando...';
+
+            const fullPrompt = `Coloring book page for kids: ${userPrompt}. The character must be easily recognizable and faithful to its original design from the movie/cartoon/game. Use thick, clean black outlines. The image should be simple, with no colors or shading, on a plain white background.`;
+            const payload = {
+                instances: [{ prompt: fullPrompt }],
+                parameters: { "sampleCount": 1 }
+            };
+            let success = false;
+            let attempts = 0;
+            const maxAttempts = 5;
+            while (attempts < maxAttempts && !success) {
+                try {
+                    const response = await fetch(IMAGE_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const result = await response.json();
+                    if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                        generatedImage.src = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        imageWrapper.classList.remove('hidden');
+                        actionButtons.classList.remove('hidden');
+                        success = true;
+                    } else { throw new Error("Resposta da API inválida ou sem imagem."); }
+                } catch (error) {
+                    console.error(`Tentativa ${attempts + 1} falhou:`, error);
+                    attempts++;
+                    if (attempts < maxAttempts) { await new Promise(res => setTimeout(res, Math.pow(2, attempts) * 1000)); }
+                }
+            }
+            loader.classList.add('hidden');
+            generateBtn.disabled = false;
+            generateBtn.textContent = '✨ Gerar Desenho!';
+            if (!success) { errorMessage.classList.remove('hidden'); }
+        };
+
+        const downloadPDF = async () => {
+            downloadBtn.textContent = 'Preparando PDF...';
+            downloadBtn.disabled = true;
+            const { jsPDF } = window.jspdf;
+            try {
+                const canvas = await html2canvas(imageWrapper, { scale: 2, backgroundColor: '#ffffff' }); 
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const imgProps = pdf.getImageProperties(imgData);
+                const margin = 15;
+                const usableWidth = pdfWidth - (margin * 2);
+                const usableHeight = pdfHeight - (margin * 2);
+                const imgAspectRatio = imgProps.width / imgProps.height;
+                let finalImgWidth = usableWidth;
+                let finalImgHeight = finalImgWidth / imgAspectRatio;
+                if (finalImgHeight > usableHeight) {
+                    finalImgHeight = usableHeight;
+                    finalImgWidth = finalImgHeight * imgAspectRatio;
+                }
+                const x = (pdfWidth - finalImgWidth) / 2;
+                const y = (pdfHeight - finalImgHeight) / 2;
+                pdf.addImage(imgData, 'PNG', x, y, finalImgWidth, finalImgHeight);
+                pdf.save('desenho-para-colorir-gugu-color-ia.pdf');
+            } catch(e) {
+                console.error("Erro ao gerar PDF:", e);
+            } finally {
+                downloadBtn.textContent = '📄 Baixar PDF';
+                downloadBtn.disabled = false;
+            }
+        };
+
+        // --- Event Listeners ---
+        generateBtn.addEventListener('click', generateImage);
+        ideaBtn.addEventListener('click', getDrawingIdea);
+        characterIdeaBtn.addEventListener('click', getCharacterIdeas);
+        regenerateBtn.addEventListener('click', generateImage);
+        storyBtn.addEventListener('click', generateStory);
+        downloadBtn.addEventListener('click', downloadPDF);
+        promptInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') generateImage();
+        });
+        promptInput.addEventListener('input', () => {
+            promptError.classList.add('hidden');
+            const hasText = promptInput.value.trim().length > 2;
+            characterIdeaBtn.classList.toggle('hidden', !hasText);
+            if (!hasText) {
+                characterIdeasContainer.classList.add('hidden');
+                characterIdeasContainer.innerHTML = '';
+            }
+        });
+
+    </script>
+</body>
+</html>
